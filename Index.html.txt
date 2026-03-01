@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <title>Decathlon Safety Pulse</title>
+    
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
+
+    <style>
+        :root {
+            --d-blue: #0082C3; --d-navy: #001018; --d-green: #34C759;
+            --d-orange: #FF9500; --d-red: #FF3B30; --glass: rgba(255, 255, 255, 0.08);
+        }
+        body { font-family: 'Inter', sans-serif; background: var(--d-navy); color: white; margin: 0; padding-bottom: 120px; -webkit-font-smoothing: antialiased; }
+        
+        /* TOP NAV */
+        .wh-stats { display: flex; background: rgba(0,0,0,0.8); padding: 12px; gap: 8px; position: sticky; top: 0; z-index: 2000; backdrop-filter: blur(15px); border-bottom: 1px solid rgba(255,255,255,0.1); }
+        .wh-card { flex: 1; background: var(--glass); padding: 8px; border-radius: 8px; text-align: center; border: 1px solid rgba(255,255,255,0.05); }
+        .wh-score-text { font-size: 14px; font-weight: 900; }
+
+        /* DASHBOARD */
+        .dashboard { background: linear-gradient(180deg, rgba(0,130,195,0.2) 0%, transparent 100%); padding: 25px 15px; text-align: center; }
+        .ring-box { position: relative; width: 140px; height: 140px; margin: 0 auto 10px; }
+        #avatar { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 90px; height: 90px; border-radius: 50%; border: 3px solid var(--d-blue); z-index: 5; background: #000; object-fit: cover; }
+        .ring-svg { transform: rotate(-90deg); }
+        .ring-fill { fill: none; stroke-width: 8; stroke-dasharray: 440; stroke-dashoffset: 440; transition: 1s ease; stroke: #222; }
+
+        /* TRAFFIC COLORS */
+        .score-green { color: var(--d-green) !important; stroke: var(--d-green) !important; }
+        .score-orange { color: var(--d-orange) !important; stroke: var(--d-orange) !important; }
+        .score-red { color: var(--d-red) !important; stroke: var(--d-red) !important; }
+
+        .container { padding: 15px; max-width: 600px; margin: auto; }
+        .glass-card { background: var(--glass); border-radius: 20px; padding: 20px; margin-bottom: 20px; border: 1px solid rgba(255,255,255,0.1); }
+        h2 { font-size: 11px; color: var(--d-blue); letter-spacing: 1px; text-transform: uppercase; margin-bottom: 15px; }
+
+        /* NO OPTIONS SUITE */
+        .action-plan-suite { display: none; margin-top: 15px; padding: 15px; background: rgba(255,59,48,0.05); border-radius: 12px; border-left: 4px solid var(--d-red); }
+        .form-row { margin-bottom: 10px; }
+        .form-row label { display: block; font-size: 9px; color: var(--d-blue); font-weight: 800; margin-bottom: 4px; }
+        .action-plan-suite input, .action-plan-suite textarea { width: 100%; padding: 10px; background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; color: white; box-sizing: border-box; }
+
+        .priority-select { display: flex; gap: 5px; margin-bottom: 10px; }
+        .pri-btn { flex: 1; padding: 10px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.1); font-size: 10px; font-weight: 800; cursor: pointer; background: rgba(255,255,255,0.05); color: white; }
+        .pri-btn.low-active { background: #555 !important; }
+        .pri-btn.mid-active { background: var(--d-orange) !important; }
+        .pri-btn.high-active { background: var(--d-red) !important; }
+
+        .q-row { padding: 15px 0; border-bottom: 1px solid rgba(255,255,255,0.05); }
+        .btn-flex { display: flex; gap: 8px; margin-top: 10px; }
+        .btn-opt { flex: 1; padding: 12px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.1); background: rgba(255,255,255,0.05); color: white; font-weight: 800; cursor: pointer; font-size: 11px; transition: 0.2s; }
+        
+        .active-y { background: var(--d-green) !important; }
+        .active-n { background: var(--d-red) !important; }
+        .active-na { background: #555 !important; }
+
+        .footer { position: fixed; bottom: 0; width: 100%; background: rgba(0,16,24,0.98); padding: 15px; box-sizing: border-box; }
+        .submit-btn { background: var(--d-blue); color: white; width: 100%; padding: 16px; border-radius: 50px; border: none; font-weight: 900; font-size: 15px; cursor: pointer; box-shadow: 0 10px 20px rgba(0,130,195,0.3); }
+    </style>
+</head>
+<body>
+
+<div class="wh-stats">
+    <div class="wh-card"><div style="font-size:7px; opacity:0.5;">NCAR</div><div id="wh-ncar" class="wh-score-text">96%</div></div>
+    <div class="wh-card"><div style="font-size:7px; opacity:0.5;">WCAR</div><div id="wh-wcar" class="wh-score-text">88%</div></div>
+    <div class="wh-card"><div style="font-size:7px; opacity:0.5;">SCAR</div><div id="wh-scar" class="wh-score-text">72%</div></div>
+</div>
+
+<div class="dashboard">
+    <div class="ring-box">
+        <img id="avatar" src="https://www.gravatar.com/avatar/0?d=mp" crossorigin="anonymous">
+        <svg width="140" height="140" class="ring-svg"><circle id="score-ring" class="ring-fill" cx="70" cy="70" r="65"></circle></svg>
+    </div>
+    <div id="user-display-name" style="font-size: 16px; font-weight: 900; letter-spacing: 1px;">DECATHLON AUDIT</div>
+    <div id="score-percent" style="font-size: 42px; font-weight: 900;">0%</div>
+</div>
+
+<div class="container">
+    <div id="lockout-msg" style="display:none; background:rgba(255,59,48,0.2); border:1px solid var(--d-red); padding:15px; border-radius:15px; text-align:center; margin-bottom:20px; font-weight: 700;"></div>
+
+    <div class="glass-card">
+        <h2>Configuration</h2>
+        <input type="email" id="u-mail" placeholder="Email ID *" oninput="syncIdentity(this.value)" style="width:100%; padding:14px; border-radius:12px; background:rgba(255,255,255,0.05); border:1px solid rgba(255,255,255,0.1); color:white; margin-bottom:10px;">
+        <select id="u-wh" onchange="checkLock()" style="width:100%; padding:14px; border-radius:12px; background:rgba(255,255,255,0.05); border:1px solid rgba(255,255,255,0.1); color:white; margin-bottom:10px;">
+            <option value="">Warehouse</option><option>NCAR</option><option>WCAR</option><option>SCAR</option>
+        </select>
+        <select id="u-dept" onchange="checkLock()" style="width:100%; padding:14px; border-radius:12px; background:rgba(255,255,255,0.05); border:1px solid rgba(255,255,255,0.1); color:white;">
+            <option value="">Department</option>
+            <option>OUTBOUND</option><option>INBOUND</option><option>REPRO</option><option>ECOM</option><option>MARKETPLACE</option>
+        </select>
+    </div>
+
+    <div id="questions-list"></div>
+
+    <div class="glass-card">
+        <h2>Live Logs (Google Sheet)</h2>
+        <div id="recent-logs" style="font-size:10px; opacity:0.7;">Syncing cloud data...</div>
+    </div>
+
+    <div class="glass-card">
+        <h2>Digital Signature</h2>
+        <canvas id="sig-pad" style="width:100%; height:100px; background:white; border-radius:12px;"></canvas>
+    </div>
+</div>
+
+<div class="footer">
+    <button id="submit-action" class="submit-btn" onclick="finalizeAudit()">FINALIZE & SYNC CLOUD</button>
+</div>
+
+<script>
+const scriptURL = 'https://script.google.com/macros/s/AKfycbyPRd5yH5jYGinU614tWjfCMLXSEAWIOQKvgaG6dRhIXNTFhw0KHLV5GDXWlTUTOFuF/exec';
+
+const auditContent = [
+    { cat: "Circulation", qs: ["Clear access through all aisles maintained", "Evacuation Pathway not blocked", "Fire fighting equipment accessible", "Workstation marking respected"] },
+    { cat: "Storage Organisation", qs: ["Flaps folded & empty boxes removed", "Pallet arrangement in line", "Loading bay pallet lines respected", "Pallet height within 5 boxes", "High rack shrinkwrap proper", "SOP for EV Bike/F&B followed"] },
+    { cat: "Hygene & Safety", qs: ["Floor clear of debris", "Workstation hygiene proper", "MSDS available for all chemicals", "Team using Safety Cutters/Helmets"] },
+    { cat: "People Safety", qs: ["Team aware of Evacuation/Fire SOP", "Team aware of POSH/Whispli", "Personal credentials used"] }
+];
+
+let stateAnswers = {};
+let priorityStates = {};
+
+function applyColor(val, elId) {
+    const el = document.getElementById(elId);
+    el.classList.remove('score-green', 'score-orange', 'score-red');
+    if(val >= 95) el.classList.add('score-green');
+    else if(val >= 80) el.classList.add('score-orange');
+    else el.classList.add('score-red');
+}
+
+// Initial score bar setup
+['wh-ncar', 'wh-wcar', 'wh-scar'].forEach(id => applyColor(parseInt(document.getElementById(id).innerText), id));
+
+function syncIdentity(email) {
+    if(email.includes('@')) {
+        let name = email.split('@')[0].split('.').map(s => s.charAt(0).toUpperCase() + s.slice(1)).join(' ');
+        document.getElementById('user-display-name').innerText = name;
+        const hash = CryptoJS.MD5(email.trim().toLowerCase());
+        document.getElementById('avatar').src = `https://www.gravatar.com/avatar/${hash}?d=identicon&s=200`;
+    }
+}
+
+const root = document.getElementById('questions-list');
+auditContent.forEach((sec, sIdx) => {
+    let html = `<div class="glass-card"><h2>${sec.cat}</h2>`;
+    sec.qs.forEach((q, qIdx) => {
+        let id = `s${sIdx}q${qIdx}`;
+        html += `<div class="q-row">
+            <div style="font-size:13px;">${q}</div>
+            <div class="btn-flex">
+                <button class="btn-opt" id="y-${id}" onclick="setAns('${id}','y')">YES</button>
+                <button class="btn-opt" id="n-${id}" onclick="setAns('${id}','n')">NO</button>
+                <button class="btn-opt" id="na-${id}" onclick="setAns('${id}','na')">N/A</button>
+            </div>
+            <div id="suite-${id}" class="action-plan-suite">
+                <div class="form-row"><label>Priority</label>
+                    <div class="priority-select">
+                        <button class="pri-btn" id="pri-low-${id}" onclick="setPri('${id}','low')">LOW</button>
+                        <button class="pri-btn" id="pri-mid-${id}" onclick="setPri('${id}','mid')">MID</button>
+                        <button class="pri-btn" id="pri-high-${id}" onclick="setPri('${id}','high')">HIGH</button>
+                    </div>
+                </div>
+                <div class="form-row"><label>Action Plan</label><textarea id="act-${id}" placeholder="Resolution steps..."></textarea></div>
+                <div class="form-row"><label>Responsible</label><input type="text" id="resp-${id}" placeholder="Name"></div>
+                <div class="form-row"><label>Deadline</label><input type="date" id="date-${id}"></div>
+            </div>
+        </div>`;
+    });
+    root.innerHTML += html + `</div>`;
+});
+
+function setAns(id, val) {
+    stateAnswers[id] = val;
+    document.getElementById(`y-${id}`).className = "btn-opt" + (val === 'y' ? ' active-y' : '');
+    document.getElementById(`n-${id}`).className = "btn-opt" + (val === 'n' ? ' active-n' : '');
+    document.getElementById(`na-${id}`).className = "btn-opt" + (val === 'na' ? ' active-na' : '');
+    document.getElementById(`suite-${id}`).style.display = (val === 'n') ? 'block' : 'none';
+    refreshScore();
+}
+
+function setPri(id, p) {
+    ['low', 'mid', 'high'].forEach(t => document.getElementById(`pri-${t}-${id}`).classList.remove(`${t}-active`));
+    document.getElementById(`pri-${p}-${id}`).classList.add(`${p}-active`);
+    priorityStates[id] = p;
+}
+
+function refreshScore() {
+    let yes = 0, no = 0;
+    Object.values(stateAnswers).forEach(v => { if(v==='y') yes++; if(v==='n') no++; });
+    let score = (yes + no > 0) ? Math.round((yes / (yes + no)) * 100) : 0;
+    const txt = document.getElementById('score-percent');
+    const ring = document.getElementById('score-ring');
+    txt.innerText = score + "%";
+    applyColor(score, 'score-percent');
+    ring.className.baseVal = "ring-fill " + (score >= 95 ? 'score-green' : score >= 80 ? 'score-orange' : 'score-red');
+    ring.style.strokeDashoffset = 440 - (440 * (score / 100));
+}
+
+async function loadRecentAudits() {
+    try {
+        const response = await fetch(scriptURL);
+        const data = await response.json();
+        const container = document.getElementById('recent-logs');
+        container.innerHTML = "";
+        data.reverse().slice(0, 5).forEach(row => {
+            container.innerHTML += `<div style="padding:5px 0; border-bottom:1px solid rgba(255,255,255,0.05)"><strong>${row[3]} (${row[5]})</strong> - <small>${row[1]}</small></div>`;
+        });
+    } catch (e) { document.getElementById('recent-logs').innerText = "Cloud offline."; }
+}
+
+async function finalizeAudit() {
+    const wh = document.getElementById('u-wh').value;
+    const dept = document.getElementById('u-dept').value;
+    const score = document.getElementById('score-percent').innerText;
+    const btn = document.getElementById('submit-action');
+
+    if(!wh || !dept) { alert("Config missing"); return; }
+    btn.innerText = "UPLOADING TO SHEET...";
+    btn.disabled = true;
+
+    const auditData = {
+        auditor: document.getElementById('user-display-name').innerText,
+        email: document.getElementById('u-mail').value,
+        warehouse: wh,
+        dept: dept,
+        score: score,
+        issues: priorityStates
+    };
+
+    try {
+        await fetch(scriptURL, { method: 'POST', mode: 'no-cors', body: JSON.stringify(auditData) });
+        alert("Synced to Google Sheet!");
+        html2pdf().from(document.body).set({ margin: 5 }).save(`Audit_${wh}_${dept}.pdf`);
+    } catch (e) { alert("Sync Error"); }
+    btn.innerText = "FINALIZE & SYNC CLOUD";
+    btn.disabled = false;
+    loadRecentAudits();
+}
+
+// Sig Pad
+const canvas = document.getElementById('sig-pad');
+const ctx = canvas.getContext('2d');
+let drawing = false;
+canvas.addEventListener('mousedown', () => drawing = true);
+canvas.addEventListener('mouseup', () => { drawing = false; ctx.beginPath(); });
+canvas.addEventListener('mousemove', (e) => { if(!drawing) return; ctx.lineWidth = 2; ctx.lineTo(e.offsetX, e.offsetY); ctx.stroke(); });
+
+loadRecentAudits();
+</script>
+</body>
+</html>
